@@ -1,0 +1,11 @@
+# 内核限制
+cat /proc/sys/fs/file-max
+# 系统限制
+ulimit -a
+ulimit -n
+# 系统打开的句柄数
+lsof | wc -l
+# 进程限制
+cat /proc/17311/limits
+# 进程打开的句柄数
+lsof -p 17311 | wc -l

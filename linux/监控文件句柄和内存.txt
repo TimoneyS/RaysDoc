@@ -1,0 +1,12 @@
+#!/bin/bash
+
+while true;
+do
+        now=`date '+%x %X'`
+        echo $now >> monitor.log
+        free -g >> monitor.log
+        filehandle=`lsof -u billintf | wc -l`
+        echo file handle count: $filehandle >> monitor.log
+        sleep 60
+done
+

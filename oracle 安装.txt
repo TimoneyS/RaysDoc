@@ -1,0 +1,185 @@
+﻿============================ 环境 ============================
+
+---- 1 - 关闭 selinux
+
+查看selinux状态：getenforce 或者sestatus -v
+临时关闭：setenforce 0
+永久关闭：vim  /etc/selinux/config 设置SELINUX=disabled
+
+
+---- 2 - 关闭防火墙
+
+systemctl stop firewalld.service
+systemctl disable firewalld.service
+
+-- iptables 本次 未安装
+yum -y install iptables-services
+systemctl restart iptables.service
+systemctl enable iptables.service
+
+---- 3 - 修改系统标识
+
+vi /etc/redhat-release
+redhat-7
+
+---- 4 - 重新安装jdk
+
+
+1. 卸载自带的openJDK：
+	rpm -aq | grep java | xargs rpm -e --nodeps
+
+2. 建立JDK安装目录：
+	mkdir /usr/java
+
+3.安装JDK:
+	chmod 777 jdk-7u67-linux-x64.rpm
+	rpm -ivh jdk-7u67-linux-x64.rpm
+
+4.配置JDK环境变量：
+	vim /etc/profile
+	export JAVA_HOME=/usr/java/jdk1.7.0_67
+	export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar 
+	export PATH=$PATH:$JAVA_HOME/bin 
+5. 使JDK环境变量生效：有两种方式（建议使用第二种）
+	a.重启生效
+	b.source /etc/profile
+
+---- 5 - 安装包
+
+yum -y install binutils compat-libcap1 compat-libstdc++-33 compat-libstdc++-33*.i686 elfutils-libelf-devel gcc gcc-c++ glibc*.i686 glibc glibc-devel glibc-devel*.i686 ksh libgcc*.i686 libgcc libstdc++ libstdc++*.i686 libstdc++-devel libstdc++-devel*.i686 libaio libaio*.i686 libaio-devel libaio-devel*.i686 make sysstat unixODBC unixODBC*.i686 unixODBC-devel unixODBC-devel*.i686 libXp libXi libXtst
+yum -y install glibc-static libstdc++-static
+
+============================ 内核 ============================
+
+---- 1 - 修改 /etc/sysctl.conf
+
+vim /etc/sysctl.conf
+
+新增 如下内容
+fs.aio-max-nr = 1048576
+fs.file-max = 6815744
+kernel.shmall = 524288
+kernel.shmmax = 2147483648
+kernel.shmmni = 4096
+kernel.sem = 250 32000 100 128
+net.ipv4.ip_local_port_range = 9000 65500
+net.core.rmem_default = 262144
+net.core.rmem_max = 4194304
+net.core.wmem_default = 262144
+net.core.wmem_max = 1048576
+
+sysctl -p # 应用配置
+
+# 参数解释
+kernel.shmall ：
+	　　该参数控制可以使用的共享内存的总页数。Linux共享内存页大小为4KB,共享内存段的大小都是共享内存页大小的整数倍。一个共享内存段的最大大小是16G，那么需要共享内存页数是16GB/4KB=16777216KB/4KB=4194304（页），也就是64Bit系统下16GB物理内存，设置kernel.shmall = 4194304 符合要求。
+kernel.shmmax：
+	　　是核心参数中最重要的参数之一，用于定义单个共享内存段的最大值。64位linux系统：可取的最大值为物理内存值-1byte，建议值为多于物理内存的一半，例如，如果为16GB物理内存，可取16*1024*1024*1024-1=17179869183。
+kernel.shmmni：
+	该参数是共享内存段的最大数量。shmmni缺省值4096，一般肯定是够用了。
+kernel.sem = 250 32000 100 128 的意思是：
+　　250是参数semmsl的值，表示一个信号量集合中能够包含的信号量最大数目。
+　　32000是参数semmns的值，表示系统内可允许的信号量最大数目。
+　　100是参数semopm的值，表示单个semopm()调用在一个信号量集合上可以执行的操作数量。
+　　128是参数semmni的值，表示系统信号量集合总数。
+
+---- 2 - 修改认证模块
+
+vim /etc/security/limits.conf
+
+oracle   soft   nproc    131072
+oracle   hard   nproc    131072
+oracle   soft   nofile   131072
+oracle   hard   nofile   131072
+oracle   soft   core     unlimited
+oracle   hard   core     unlimited
+oracle   soft   memlock  50000000
+oracle   hard   memlock  50000000
+
+---- 3 - 修改用户登陆认证
+
+vim /etc/pam.d/login
+
+session required /lib64/security/pam_limits.so
+session required pam_limits.so
+
+---- 4 - 环境变量
+vim /etc/profile
+
+#oracle
+export ORACLE_HOME=/ora/oracle/product/11.2.0/db_1
+export ORACLE_SID=orcl
+if [ $USER = "oracle" ]; then
+	if [ $SHELL = "/bin/ksh" ]; then
+		ulimit -p 16384
+		ulimit -n 65536
+		else
+		ulimit -u 16384 -n 65536
+	fi
+fi
+
+---- 5 - 服务器名称写入host
+
+echo '127.0.0.1 localhost.localdomain localhost localhost.localdomain' >> /etc/hosts
+
+
+
+============================ 用户和组 ============================
+---- 1 - 创建用户和组
+
+groupadd oinstall
+groupadd dba
+useradd -g oinstall -G dba -m oracle
+passwd oracle
+
+
+---- 2 - 创建目录
+mkdir -p /ora/oracle
+chown -R oracle:oinstall /ora
+chmod 777 -R /ora
+
+
+---- 3 - 修改oracle用户环境变量
+
+vim /home/oracle/.bash_profile
+
+export ORACLE_BASE=/ora/oracle
+export ORACLE_HOME=$ORACLE_BASE/product/11.2.0/db_1
+export ORACLE_SID=orcl
+export ORACLE_TERM=xterm
+export PATH=$ORACLE_HOME/bin:/usr/sbin:$PATH
+export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
+export LANG=C
+export NLS_LANG=AMERICAN_AMERICA.ZHS16GBK
+
+source /home/oracle/.bash_profile
+
+---- 4 - 解压
+cd /ora
+unzip linux.x64_11gR2_database_2of2.zip -d /ora
+unzip linux.x64_11gR2_database_2of2.zip -d /ora
+
+---- 5 - 新增 swap
+
+dd if=/dev/zero of=/home/swap bs=1024 count=1024000
+mkswap /home/swap
+swapon /home/swap
+
+
+---- 6 - 启动oracle
+1. 启动监听
+lsnrctl start
+lsnrctl status
+
+2.以SYS用户身份登录Oracle
+sqlplus /nolog
+conn /as sysdba
+
+3.通过startup命令启动实例
+startup
+
+---- 7 - 关闭oracle
+shutdown
+lsnrctl stop
+
+SHOW PARAMETER service_names;

@@ -1,0 +1,47 @@
+﻿1.以sysdba的身份登录oracle.
+conn scott/tiger as sysdba
+
+2. 创建用户
+create user jd identified by root; 
+
+3.创建好用户我们接着就可以修改用户的密码.
+alter user jd identified by root;  
+
+4.默认情况下用户创建好后系统会默认给该用户分配一个表空间（users）;
+查看所有用户所在的表空间.
+select username,default_tablespace from dba_users;  
+
+5.创建表空间
+create tablespace ts_vb datafile '/opt/oracle/db01/ts_vb.dbf' size 200M;  
+
+6.分配表空间
+alter user jd default tablespace ts_vb;  
+
+7.分配权限
+grant create session,create table,create view,create sequence,unlimited tablespace to jd;  
+
+8.登陆
+conn jd/root; 
+
+9.查询用户权限
+select * from session_privs;
+
+10.删除用户
+drop user jd cascade; 
+
+
+
+create user cd identified by root;
+create user id identified by root;
+create user pd identified by root;
+create user zd identified by root;
+
+alter user cd default tablespace ts_vb;
+alter user id default tablespace ts_vb;
+alter user pd default tablespace ts_vb;
+alter user zd default tablespace ts_vb;
+
+grant create session,create table,create view,create sequence,unlimited tablespace to cd;
+grant create session,create table,create view,create sequence,unlimited tablespace to id;
+grant create session,create table,create view,create sequence,unlimited tablespace to pd;
+grant create session,create table,create view,create sequence,unlimited tablespace to zd;
